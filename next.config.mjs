@@ -9,6 +9,13 @@ const nextConfig = {
   },
   experimental: {
     serverMinification: false, // the server minification unfortunately breaks the selector class names
+    serverComponentsExternalPackages: [
+      'pino',
+      'pino-pretty',
+      'rebrowser-playwright-core',
+      'ghost-cursor-playwright',
+      '@2captcha/captcha-solver'
+    ],
   },
 };  
 
