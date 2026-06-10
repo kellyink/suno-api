@@ -8,11 +8,21 @@ export async function GET(req: NextRequest) {
   if (req.method === 'GET') {
     try {
       const url = new URL(req.url);
-      // `chart` accepts 'top-50-global' (default), 'viral-50-global', or a raw playlist ID.
-      const chart = url.searchParams.get('chart') || 'top-50-global';
+      // mode: 'search' (default) builds a popularity-ranked chart proxy that
+      // works with standard credentials. 'playlist' targets an editorial/raw
+      // playlist (Top 50 / Viral 50 require grandfathered Spotify access).
+      const mode = (url.searchParams.get('mode') || 'search').toLowerCase();
       const market = url.searchParams.get('market');
 
-      const chartData = await spotifyApi.getChart(chart, market);
+      let chartData;
+      if (mode === 'playlist') {
+        const chart = url.searchParams.get('chart') || 'top-50-global';
+        chartData = await spotifyApi.getChart(chart, market);
+      } else {
+        const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+        const year = url.searchParams.get('year');
+        chartData = await spotifyApi.getChartBySearch(market, limit, year);
+      }
 
       return new NextResponse(JSON.stringify(chartData), {
         status: 200,
