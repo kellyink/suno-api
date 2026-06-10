@@ -37,7 +37,10 @@ export interface AudioInfo {
   negative_tags?: string; // Negative tags of music.
   duration?: string; // Duration of the audio
   error_message?: string; // Error message if any
-}
+  play_count?: number; // Global play count (explore/trending feeds)
+  upvote_count?: number; // Global upvote count (explore/trending feeds)
+  is_public?: boolean; // Whether the clip is publicly listed
+  }
 
 interface PersonaResponse {
   persona: {
@@ -801,6 +804,73 @@ class SunoApi {
       tags: audio.metadata.tags,
       duration: audio.metadata.duration,
       error_message: audio.metadata.error_message
+    }));
+  }
+
+  /**
+   * Well-known public Suno playlist IDs that back the explore/trending feeds.
+   * These are global feeds and are NOT scoped to the authenticated user's library.
+   */
+  private static EXPLORE_PLAYLISTS: Record<string, string> = {
+    trending: '1190bf92-10dc-4ce5-968a-7a377f37f984',
+    new: 'cc14084a-2622-4c4b-8258-1f6b4b4f54b3'
+  };
+
+  /**
+   * Retrieves audio information from Suno's public explore/trending feeds.
+   * Unlike `get`, this pulls from global public playlists rather than the
+   * authenticated user's own library, which is useful for tracking global
+   * music metrics.
+   * @param feed The feed to pull from ('trending' or 'new'), or a raw playlist ID.
+   * @param page An optional page number to paginate through the feed.
+   * @returns A promise that resolves to an array of AudioInfo objects.
+   */
+  public async getTrending(
+    feed: string = 'trending',
+    page?: string | null
+  ): Promise<AudioInfo[]> {
+    await this.keepAlive(false);
+
+    const playlistId =
+      SunoApi.EXPLORE_PLAYLISTS[feed.toLowerCase()] ?? feed;
+
+    const url = new URL(`${SunoApi.BASE_URL}/api/playlist/${playlistId}/`);
+    if (page) {
+      url.searchParams.append('page', page);
+    }
+
+    logger.info('Get trending feed: ' + url.href);
+    const response = await this.client.get(url.href, {
+      // 10 seconds timeout
+      timeout: 10000
+    });
+
+    // Playlist responses nest clips under `playlist_clips[].clip`.
+    const clips = (response.data.playlist_clips ?? []).map(
+      (entry: any) => entry.clip ?? entry
+    );
+
+    return clips.map((audio: any) => ({
+      id: audio.id,
+      title: audio.title,
+      image_url: audio.image_url,
+      lyric: audio.metadata?.prompt
+        ? this.parseLyrics(audio.metadata.prompt)
+        : '',
+      audio_url: audio.audio_url,
+      video_url: audio.video_url,
+      created_at: audio.created_at,
+      model_name: audio.model_name,
+      status: audio.status,
+      gpt_description_prompt: audio.metadata?.gpt_description_prompt,
+      prompt: audio.metadata?.prompt,
+      type: audio.metadata?.type,
+      tags: audio.metadata?.tags,
+      duration: audio.metadata?.duration,
+      error_message: audio.metadata?.error_message,
+      play_count: audio.play_count,
+      upvote_count: audio.upvote_count,
+      is_public: audio.is_public
     }));
   }
 
